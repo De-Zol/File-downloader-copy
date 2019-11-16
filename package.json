@@ -1,0 +1,19 @@
+{
+  "name": "file-downloader",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/De-Zol/File-downloader.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/De-Zol/File-downloader/issues"
+  },
+  "homepage": "https://github.com/De-Zol/File-downloader#readme"
+}
