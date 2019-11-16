@@ -2,9 +2,9 @@
   "name": "file-downloader",
   "version": "0.0.1",
   "description": "",
-  "main": "index.js",
+  "main": "dist-dev/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "tsc & node dist-dev/index.js"
   },
   "repository": {
     "type": "git",
@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/De-Zol/File-downloader/issues"
   },
-  "homepage": "https://github.com/De-Zol/File-downloader#readme"
+  "homepage": "https://github.com/De-Zol/File-downloader#readme",
+  "devDependencies": {
+    "tslint": "^5.20.1",
+    "typescript": "^3.7.2"
+  }
 }
