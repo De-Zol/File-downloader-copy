@@ -17,7 +17,11 @@
   },
   "homepage": "https://github.com/De-Zol/File-downloader#readme",
   "devDependencies": {
+    "@types/node": "^12.12.8",
     "tslint": "^5.20.1",
     "typescript": "^3.7.2"
+  },
+  "dependencies": {
+    "request": "^2.88.0"
   }
 }
