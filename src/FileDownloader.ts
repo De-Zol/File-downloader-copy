@@ -3,21 +3,31 @@ import * as request from 'request';
 import * as path from 'path';
 import * as fs from 'fs';
 import {DownloadStatus, EventType} from './types';
+import {Observable, asapScheduler} from 'rxjs/';
+import {observeOn} from 'rxjs/operators';
+import {SyncObservable} from './SyncObservable';
 
 export class FileDownloader extends EventEmitter {
     private _filePath = '';
     private _chunkSizeInBytes = 0;
-    private _chunkSizeInKBytes = 100;
+    private _chunkSizeInKBytes = 1024 * 5;
     private _downloadedSize = 0;
     private _fileLength = 0;
     private _isDownload = false;
     private _status: DownloadStatus = DownloadStatus.IDLE;
+
+    private _chunksObs: SyncObservable<Buffer>;
+    private _chunksSubscriber;
+
+    private downloadStart: number;
 
     constructor(private _url: string, private _saveDir: string) {
         super();
 
         this._chunkSizeInBytes = 1024 * this._chunkSizeInKBytes;
         this.emit(EventType.STATUS, this._status);
+
+        this._chunksObs = new SyncObservable(this._writeChunk.bind(this));
     }
 
     public start() {
@@ -51,15 +61,15 @@ export class FileDownloader extends EventEmitter {
     private async _download() {
         this._setDownloadStatus(DownloadStatus.DOWNLOADING);
         this._isDownload = true;
+        this.downloadStart = Date.now();
         while (this._isDownload) {
             try {
                 await this._downloadChunk();
-                this._downloadedSize += this._chunkSizeInBytes;
-                if (this._downloadedSize > this._fileLength) {
-                    this._downloadedSize = this._fileLength;
-                }
+                // this._downloadedSize += this._chunkSizeInBytes;
+                // if (this._downloadedSize > this._fileLength) {
+                //     this._downloadedSize = this._fileLength;
+                // }
                 this._isDownload = this._isDownload && this._downloadedSize < this._fileLength;
-                this._calcProgress();
             } catch (err) {
                 this._setDownloadStatus(DownloadStatus.ERROR);
                 this.emit(EventType.ERROR, err);
@@ -67,6 +77,7 @@ export class FileDownloader extends EventEmitter {
                 console.log('err', err);
             }
         }
+        console.log('DOWNLOAD END', Date.now() - this.downloadStart);
         if (this._downloadedSize >= this._fileLength) {
             this._setDownloadStatus(DownloadStatus.ENDED);
         }
@@ -80,8 +91,14 @@ export class FileDownloader extends EventEmitter {
                     let chunkBuffer: Buffer = new Buffer([]);
                     resp.on('data', (chunk) => {
                         chunkBuffer = Buffer.concat([chunkBuffer, chunk]);
+                        this._chunksObs.next(chunk);
+                        // fs.writeFileSync(this._filePath, chunk, {flag: 'a'});
+                        // this._downloadedSize += chunk.length;
+                        // this._calcProgress();
                     }).on('end', () => {
-                        fs.writeFileSync(this._filePath, chunkBuffer, {flag: 'a'});
+                        // fs.writeFileSync(this._filePath, chunkBuffer, {flag: 'a'});
+                        // this._downloadedSize += chunkBuffer.length;
+                        // this._calcProgress();
                         resolve();
                     });
                 });
@@ -159,4 +176,17 @@ export class FileDownloader extends EventEmitter {
         this.emit(EventType.PROGRESS, progress);
     }
 
+    private _writeChunk(chunk: Buffer): Promise<void> {
+        this._downloadedSize += chunk.length;
+        if (this._downloadedSize === this._fileLength) {
+            console.log('end===================================>');
+            this._isDownload = false;
+        }
+        this._calcProgress();
+        return new Promise(((resolve, reject) => {
+            fs.writeFile(this._filePath, chunk, {flag: 'a'}, (err) => {
+                resolve();
+            });
+        }));
+    }
 }
