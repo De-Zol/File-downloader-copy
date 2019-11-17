@@ -18,6 +18,10 @@ downloader.on(EventType.STATUS, (status: DownloadStatus) => {
 downloader.on(EventType.ERROR, (err) => {
     console.log('error', err);
 });
+
+downloader.on(EventType.PROGRESS, (progress: number) => {
+    console.log('progress:', progress);
+});
 downloader.start();
 
 function getFileExtension(resp): string {

@@ -31,7 +31,7 @@ export class FileDownloader extends EventEmitter {
             }).catch((err) => this.emit(EventType.ERROR, err));
     }
 
-    public stop() {
+    public pause() {
         if (this._status === DownloadStatus.DOWNLOADING || this._status === DownloadStatus.PREPARING) {
             this._isDownload = false;
             this._setDownloadStatus(DownloadStatus.PAUSED);
@@ -55,8 +55,11 @@ export class FileDownloader extends EventEmitter {
             try {
                 await this._downloadChunk();
                 this._downloadedSize += this._chunkSizeInBytes;
+                if (this._downloadedSize > this._fileLength) {
+                    this._downloadedSize = this._fileLength;
+                }
                 this._isDownload = this._isDownload && this._downloadedSize < this._fileLength;
-                console.log('_downloadedSize', this._downloadedSize);
+                this._calcProgress();
             } catch (err) {
                 this._setDownloadStatus(DownloadStatus.ERROR);
                 this.emit(EventType.ERROR, err);
@@ -149,6 +152,11 @@ export class FileDownloader extends EventEmitter {
     private _setDownloadStatus(state: DownloadStatus) {
         this._status = state;
         this.emit(EventType.STATUS, this._status);
+    }
+
+    private _calcProgress() {
+        const progress = (this._downloadedSize * 100) / this._fileLength;
+        this.emit(EventType.PROGRESS, progress);
     }
 
 }
