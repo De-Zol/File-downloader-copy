@@ -2,8 +2,7 @@ import {EventEmitter} from 'events';
 import * as request from 'request';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as http from 'http';
-import * as https from 'https';
+import {DownloadStatus, EventType} from './types';
 
 export class FileDownloader extends EventEmitter {
     private _filePath = '';
@@ -11,29 +10,63 @@ export class FileDownloader extends EventEmitter {
     private _chunkSizeInKBytes = 100;
     private _downloadedSize = 0;
     private _fileLength = 0;
+    private _isDownload = false;
+    private _status: DownloadStatus = DownloadStatus.IDLE;
 
     constructor(private _url: string, private _saveDir: string) {
         super();
 
         this._chunkSizeInBytes = 1024 * this._chunkSizeInKBytes;
+        this.emit(EventType.STATUS, this._status);
     }
 
     public start() {
+        this._setDownloadStatus(DownloadStatus.PREPARING);
         this._getFileName()
             .then(async (fileName) => {
                 this._filePath = path.join(this._saveDir, fileName);
+                await this._download();
                 console.log(this._filePath);
-                while (this._downloadedSize < this._fileLength) {
-                    try {
-                        await this._downloadChunk();
-                        this._downloadedSize += this._chunkSizeInBytes;
-                        console.log('_downloadedSize', this._downloadedSize);
-                    } catch (err) {
-                        console.log('err', err);
-                    }
-                }
                 console.log('done');
-            });
+            }).catch((err) => this.emit(EventType.ERROR, err));
+    }
+
+    public stop() {
+        if (this._status === DownloadStatus.DOWNLOADING || this._status === DownloadStatus.PREPARING) {
+            this._isDownload = false;
+            this._setDownloadStatus(DownloadStatus.PAUSED);
+        }
+    }
+
+    public resume() {
+        if (this._status === DownloadStatus.PAUSED) {
+            this._download();
+        }
+    }
+
+    public getDownloadStatus(): DownloadStatus {
+        return this._status;
+    }
+
+    private async _download() {
+        this._setDownloadStatus(DownloadStatus.DOWNLOADING);
+        this._isDownload = true;
+        while (this._isDownload) {
+            try {
+                await this._downloadChunk();
+                this._downloadedSize += this._chunkSizeInBytes;
+                this._isDownload = this._isDownload && this._downloadedSize < this._fileLength;
+                console.log('_downloadedSize', this._downloadedSize);
+            } catch (err) {
+                this._setDownloadStatus(DownloadStatus.ERROR);
+                this.emit(EventType.ERROR, err);
+                this._isDownload = false;
+                console.log('err', err);
+            }
+        }
+        if (this._downloadedSize >= this._fileLength) {
+            this._setDownloadStatus(DownloadStatus.ENDED);
+        }
     }
 
     private _downloadChunk(): Promise<void> {
@@ -64,14 +97,6 @@ export class FileDownloader extends EventEmitter {
                 range: `bytes=${this._downloadedSize}-${rangeEnd}`
             }
         };
-    }
-
-    public stop() {
-
-    }
-
-    public resume() {
-
     }
 
     private _getFileName(): Promise<string> {
@@ -120,4 +145,10 @@ export class FileDownloader extends EventEmitter {
         this._fileLength = parseInt(resp.headers['content-length'], 10);
         console.log('this._fileLength', this._fileLength);
     }
+
+    private _setDownloadStatus(state: DownloadStatus) {
+        this._status = state;
+        this.emit(EventType.STATUS, this._status);
+    }
+
 }
