@@ -7,21 +7,63 @@ import * as https from 'https';
 
 export class FileDownloader extends EventEmitter {
     private _filePath = '';
+    private _chunkSizeInBytes = 0;
+    private _chunkSizeInKBytes = 100;
+    private _downloadedSize = 0;
+    private _fileLength = 0;
 
     constructor(private _url: string, private _saveDir: string) {
         super();
+
+        this._chunkSizeInBytes = 1024 * this._chunkSizeInKBytes;
     }
 
     public start() {
         this._getFileName()
-            .then((fileName) => {
+            .then(async (fileName) => {
                 this._filePath = path.join(this._saveDir, fileName);
                 console.log(this._filePath);
-                request.get(this._url)
-                    .on('end', () => console.log('end download'))
-                    .on('error', (err) => console.log('download error', err))
-                    .pipe(fs.createWriteStream(this._filePath));
+                while (this._downloadedSize < this._fileLength) {
+                    try {
+                        await this._downloadChunk();
+                        this._downloadedSize += this._chunkSizeInBytes;
+                        console.log('_downloadedSize', this._downloadedSize);
+                    } catch (err) {
+                        console.log('err', err);
+                    }
+                }
+                console.log('done');
             });
+    }
+
+    private _downloadChunk(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            request.get(this._url, this.getRequestOptions())
+                .on('error', (err) => reject(err))
+                .on('response', (resp) => {
+                    let chunkBuffer: Buffer = new Buffer([]);
+                    resp.on('data', (chunk) => {
+                        chunkBuffer = Buffer.concat([chunkBuffer, chunk]);
+                    }).on('end', () => {
+                        fs.writeFileSync(this._filePath, chunkBuffer, {flag: 'a'});
+                        resolve();
+                    });
+                });
+        });
+    }
+
+    private getRequestOptions() {
+        let rangeEnd = this._downloadedSize + this._chunkSizeInBytes - 1;
+        if (rangeEnd >= this._fileLength) {
+            rangeEnd = this._fileLength - 1;
+            console.log('last chunk');
+        }
+        return {
+            url: this._url,
+            headers: {
+                range: `bytes=${this._downloadedSize}-${rangeEnd}`
+            }
+        };
     }
 
     public stop() {
@@ -36,6 +78,7 @@ export class FileDownloader extends EventEmitter {
         return new Promise((resolve, reject) => {
             const req = request.head(this._url, {method: 'HEAD'});
             req.on('response', (resp) => {
+                this._getFileLength(resp);
                 let fileName = this._getFileNameFromHeaders(resp);
                 if (!fileName) {
                     fileName = this._getFileNameFromPath(resp);
@@ -61,7 +104,7 @@ export class FileDownloader extends EventEmitter {
             for (let i = 0; i < arr.length; i++) {
                 if (arr[i].includes('filename')) {
                     const regex = /^filename=/g;
-                    fileName = arr[i].split(regex)[1];
+                    fileName = arr[i].trim().split(regex)[1];
                 }
             }
         }
@@ -71,5 +114,10 @@ export class FileDownloader extends EventEmitter {
     private _getFileNameFromPath(resp): string {
         console.log('getFileNameFromPath', resp.req.path);
         return decodeURIComponent(path.basename(resp.req.path).split('?')[0]);
+    }
+
+    private _getFileLength(resp) {
+        this._fileLength = parseInt(resp.headers['content-length'], 10);
+        console.log('this._fileLength', this._fileLength);
     }
 }
