@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as mime from 'mime-types';
 import {FileDownloader} from './src/FileDownloader';
 import {DownloadStatus, EventType} from './src/types';
-// const request = require('request');
+// const request = require('request'); fgnffhnfgh
 const url = 'https://ru-drivemusic.net/dl/xgmp6N2UXRdQzVWQIWoaIQ/1574037943/download_music/2013/03/one-republic-i-lived.mp3';
 // const url = 'http://modp.wgcdn.co/media/mod_files/WoT_ModPack_by_Amway921_v1.6.1.3_-_9a.zip';
 // const url = 'https://dl.pstmn.io/download/latest/win64';
